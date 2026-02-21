@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Restored Original Mirage Palette -->
+    <color name="primary">#03A9F4</color>
+    <color name="primary_dark">#0288D1</color>
+    <color name="primary_light">#E1F5FE</color>
+    <color name="accent">#00BCD4</color>
+    
+    <color name="background">#F5F7F8</color>
+    <color name="surface">#FFFFFF</color>
+    <color name="card_background">#FFFFFF</color>
+    
+    <color name="text_primary">#263238</color>
+    <color name="text_secondary">#607D8B</color>
+    <color name="text_hint">#90A4AE</color>
+    
+    <color name="divider">#ECEFF1</color>
+    <color name="border">#CFD8DC</color>
+    
+    <color name="success">#4CAF50</color>
+    <color name="warning">#FFC107</color>
+    <color name="error">#F44336</color>
+    
+    <!-- Common Colors -->
+    <color name="white">#FFFFFF</color>
+    <color name="black">#000000</color>
+    <color name="transparent">#00000000</color>
+</resources>
