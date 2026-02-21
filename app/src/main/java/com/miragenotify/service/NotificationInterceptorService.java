@@ -221,11 +221,11 @@ public class NotificationInterceptorService extends NotificationListenerService 
             NotificationManager notificationManager = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
             if (notificationManager == null) return;
             
-            Bundle extras = original.extras != null ? new Bundle(original.extras) : new Bundle();
-            extras.putBoolean("mirage_modified", true);
-            // Fix 3: Overwrite the extras bundle before posting the notification
-            extras.putCharSequence(Notification.EXTRA_TITLE, title);
-            extras.putCharSequence(Notification.EXTRA_TEXT, content);
+            // SECURITY FIX: Create a fresh Bundle instead of copying original.extras.
+            // Copying original.extras can include Uris (like avatars) that we don't have permission to access,
+            // which causes a SecurityException when calling notify().
+            Bundle newExtras = new Bundle();
+            newExtras.putBoolean("mirage_modified", true);
 
             Notification.Builder builder;
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -246,7 +246,7 @@ public class NotificationInterceptorService extends NotificationListenerService 
                     .setPriority(Notification.PRIORITY_MAX) 
                     .setDefaults(Notification.DEFAULT_ALL)
                     .setAutoCancel(true)
-                    .addExtras(extras);
+                    .addExtras(newExtras);
             
             if (sender != null && !sender.isEmpty()) {
                 builder.setSubText(sender);
@@ -254,6 +254,13 @@ public class NotificationInterceptorService extends NotificationListenerService 
             
             if (original.contentIntent != null) {
                 builder.setContentIntent(original.contentIntent);
+            }
+            
+            // Copy notification group if it exists to maintain threading
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT_WATCH) {
+                if (original.getGroup() != null) {
+                    builder.setGroup(original.getGroup());
+                }
             }
             
             String tag = "Mirage_" + sbn.getPackageName();
