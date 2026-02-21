@@ -23,6 +23,7 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
+import com.google.android.material.textfield.TextInputLayout;
 import com.miragenotify.R;
 import com.miragenotify.adapter.RuleAdapter;
 import com.miragenotify.model.NotificationRule;
@@ -75,7 +76,6 @@ public class RulesFragment extends Fragment implements RuleAdapter.OnRuleClickLi
         
         fabAdd.setOnClickListener(v -> showRuleEditorDialog(null));
         
-        // Load apps in background or once during creation
         loadInstalledApps();
     }
 
@@ -85,7 +85,6 @@ public class RulesFragment extends Fragment implements RuleAdapter.OnRuleClickLi
         installedApps.clear();
 
         for (ApplicationInfo app : apps) {
-            // Filter to show user-installed apps and updated system apps (like WhatsApp, Telegram, etc.)
             boolean isSystemApp = (app.flags & ApplicationInfo.FLAG_SYSTEM) != 0;
             boolean isUpdatedSystemApp = (app.flags & ApplicationInfo.FLAG_UPDATED_SYSTEM_APP) != 0;
             
@@ -127,6 +126,14 @@ public class RulesFragment extends Fragment implements RuleAdapter.OnRuleClickLi
         CheckBox cbContent = dialogView.findViewById(R.id.cb_content);
         CheckBox cbSender = dialogView.findViewById(R.id.cb_sender);
 
+        TextInputLayout tilSearch = dialogView.findViewById(R.id.til_search_text);
+        TextInputLayout tilSender = dialogView.findViewById(R.id.til_sender_replacement);
+        TextInputLayout tilTitle = dialogView.findViewById(R.id.til_title_replacement);
+        TextInputLayout tilContent = dialogView.findViewById(R.id.til_content_replacement);
+        TextView tvReplacementHeader = dialogView.findViewById(R.id.tv_replacement_header);
+        TextView tvApplyToHeader = dialogView.findViewById(R.id.tv_apply_to_header);
+        View checkboxContainer = dialogView.findViewById(R.id.ll_checkbox_container);
+
         // Setup Spinner
         ArrayAdapter<AppEntry> spinnerAdapter = new ArrayAdapter<>(
                 requireContext(),
@@ -135,6 +142,47 @@ public class RulesFragment extends Fragment implements RuleAdapter.OnRuleClickLi
         );
         spinnerAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
         spinnerApps.setAdapter(spinnerAdapter);
+
+        // Logic to hide/show fields based on modification type
+        rgType.setOnCheckedChangeListener((group, checkedId) -> {
+            if (checkedId == R.id.rb_mask) {
+                tilSearch.setVisibility(View.VISIBLE);
+                tilSearch.setHint("Keyword to Mask (empty masks everything)");
+                tilSender.setVisibility(View.GONE);
+                tilTitle.setVisibility(View.GONE);
+                tilContent.setVisibility(View.GONE);
+                tvReplacementHeader.setVisibility(View.GONE);
+                tvApplyToHeader.setVisibility(View.VISIBLE);
+                checkboxContainer.setVisibility(View.VISIBLE);
+            } else if (checkedId == R.id.rb_rename) {
+                tilSearch.setVisibility(View.GONE);
+                tilSender.setVisibility(View.VISIBLE);
+                tilSender.setHint("New Sender Name (Override)");
+                tilTitle.setVisibility(View.VISIBLE);
+                tilTitle.setHint("New Title (Override)");
+                tilContent.setVisibility(View.VISIBLE);
+                tilContent.setHint("New Message Body (Override)");
+                tvReplacementHeader.setVisibility(View.VISIBLE);
+                tvApplyToHeader.setVisibility(View.GONE);
+                checkboxContainer.setVisibility(View.GONE);
+                // For rename/complete override, we check all internally
+                cbSender.setChecked(true);
+                cbTitle.setChecked(true);
+                cbContent.setChecked(true);
+            } else { // Replace
+                tilSearch.setVisibility(View.VISIBLE);
+                tilSearch.setHint("Keyword to Search For");
+                tilSender.setVisibility(View.VISIBLE);
+                tilSender.setHint("New Sender Name");
+                tilTitle.setVisibility(View.VISIBLE);
+                tilTitle.setHint("New Title");
+                tilContent.setVisibility(View.VISIBLE);
+                tilContent.setHint("New Message Body");
+                tvReplacementHeader.setVisibility(View.VISIBLE);
+                tvApplyToHeader.setVisibility(View.VISIBLE);
+                checkboxContainer.setVisibility(View.VISIBLE);
+            }
+        });
 
         if (ruleToEdit != null) {
             tvTitle.setText(R.string.edit_rule);
@@ -147,7 +195,6 @@ public class RulesFragment extends Fragment implements RuleAdapter.OnRuleClickLi
             cbContent.setChecked(ruleToEdit.isModifyContent());
             cbSender.setChecked(ruleToEdit.isModifySender());
 
-            // Set spinner selection based on existing rule's package name
             for (int i = 0; i < installedApps.size(); i++) {
                 if (installedApps.get(i).packageName.equals(ruleToEdit.getTargetPackageName())) {
                     spinnerApps.setSelection(i);
@@ -183,14 +230,23 @@ public class RulesFragment extends Fragment implements RuleAdapter.OnRuleClickLi
                     rule.setSenderReplacement(etSenderReplacement.getText().toString());
                     rule.setTitleReplacement(etTitleReplacement.getText().toString());
                     rule.setContentReplacement(etContentReplacement.getText().toString());
-                    rule.setModifyTitle(cbTitle.isChecked());
-                    rule.setModifyContent(cbContent.isChecked());
-                    rule.setModifySender(cbSender.isChecked());
-
+                    
                     int checkedId = rgType.getCheckedRadioButtonId();
-                    if (checkedId == R.id.rb_replace) rule.setModificationType(NotificationRule.ModificationType.REPLACE_TEXT);
-                    else if (checkedId == R.id.rb_mask) rule.setModificationType(NotificationRule.ModificationType.MASK_TEXT);
-                    else if (checkedId == R.id.rb_rename) rule.setModificationType(NotificationRule.ModificationType.RENAME_SENDER);
+                    if (checkedId == R.id.rb_rename) {
+                        rule.setModificationType(NotificationRule.ModificationType.RENAME_SENDER);
+                        rule.setModifyTitle(true);
+                        rule.setModifyContent(true);
+                        rule.setModifySender(true);
+                    } else {
+                        rule.setModifyTitle(cbTitle.isChecked());
+                        rule.setModifyContent(cbContent.isChecked());
+                        rule.setModifySender(cbSender.isChecked());
+                        if (checkedId == R.id.rb_replace) {
+                            rule.setModificationType(NotificationRule.ModificationType.REPLACE_TEXT);
+                        } else {
+                            rule.setModificationType(NotificationRule.ModificationType.MASK_TEXT);
+                        }
+                    }
 
                     if (ruleToEdit != null) viewModel.update(rule);
                     else viewModel.insert(rule);
@@ -199,9 +255,6 @@ public class RulesFragment extends Fragment implements RuleAdapter.OnRuleClickLi
                 .show();
     }
 
-    /**
-     * Helper class to store app label and package name for the spinner
-     */
     private static class AppEntry implements Comparable<AppEntry> {
         final String label;
         final String packageName;
@@ -214,7 +267,7 @@ public class RulesFragment extends Fragment implements RuleAdapter.OnRuleClickLi
         @NonNull
         @Override
         public String toString() {
-            return label; // This is what the spinner displays
+            return label;
         }
 
         @Override
